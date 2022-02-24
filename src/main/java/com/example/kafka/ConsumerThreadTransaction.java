@@ -1,0 +1,83 @@
+package com.example.kafka;
+
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Properties;
+
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ConsumerThreadTransaction {
+        private static final Logger logger =
+                        LoggerFactory.getLogger(ConsumerThreadTransaction.class);
+        final String applicationID = "ConsumerThreadTransactionApp";
+        final String bootstrapServers = "localhost:9092,localhost:9093";
+        final String groupID = "ConsumerThreadTransactionGrp";
+        final String[] sourceTopicNames = {"output"};
+
+        public ConsumerThreadTransaction() {
+        }
+
+        public static void main(String[] args) {
+
+                ConsumerThreadTransaction consumeThreadTransaction =
+                                new ConsumerThreadTransaction();
+
+                Thread consumerThread1 = new Thread(consumeThreadTransaction.new ConsumerThread());
+                Thread consumerThread2 = new Thread(consumeThreadTransaction.new ConsumerThread());
+                consumerThread1.start();
+                consumerThread2.start();
+        }
+
+
+        class ConsumerThread implements Runnable {
+
+                @Override
+                public void run() {
+                        Properties consumerProps = new Properties();
+                        consumerProps.put(ConsumerConfig.CLIENT_ID_CONFIG, applicationID);
+                        consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                                        bootstrapServers);
+                        consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                                        StringDeserializer.class.getName());
+                        consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                                        StringDeserializer.class.getName());
+                        consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, groupID);
+                        consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+                        consumerProps.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
+
+                        KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerProps);
+                        consumer.subscribe(Arrays.asList(sourceTopicNames));
+
+                        while (true) {
+
+                                ConsumerRecords<String, String> records =
+                                                consumer.poll(Duration.ofMillis(100));
+                                for (ConsumerRecord<String, String> record : records) {
+                                        logger.info("Transaction Message - " + record.value()
+                                                        + ", Topic: " + record.topic()
+                                                        + ", Partition No: " + record.partition()
+                                                        + ", Offset No: " + record.offset());
+                                        if (record.headers().toArray().length > 0) {
+                                                record.headers().forEach(h -> {
+                                                        logger.info("    Header Key: " + h.key()
+                                                                        + ", Value: "
+                                                                        + new String(h.value()));
+                                                });
+
+                                        }
+                                }
+
+                        }
+                }
+
+        }
+
+}
+
+
